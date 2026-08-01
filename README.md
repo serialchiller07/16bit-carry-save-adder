@@ -1,165 +1,296 @@
-# 32-bit ALU on Basys3 FPGA
+# 16-bit Carry Save Adder (CSA)
 
 ## Overview
 
-This project implements a 32-bit Arithmetic Logic Unit (ALU) using Verilog HDL and deploys it on the Digilent Basys3 FPGA board.
+This project implements a **16-bit Carry Save Adder (CSA)** using Verilog HDL. The design adds three 16-bit binary numbers along with an optional carry-in and produces a 16-bit sum with additional carry outputs.
 
-The ALU performs multiple arithmetic and logical operations on two 32-bit operands. Since the Basys3 board provides only 16 switches, each 32-bit operand is entered in two parts: the lower 16 bits and the upper 16 bits.
+The design is implemented using **4-bit CSA blocks**, which are combined to form the complete 16-bit architecture.
 
-Push buttons are used to control the loading of operands and the selection of operations. The result and status flags are displayed using the onboard LEDs and 7-segment display.
+The project is designed and simulated using **Xilinx Vivado** and can be implemented on a **Digilent Basys3 FPGA board** based on the Xilinx Artix-7 FPGA.
 
 ---
 
 ## Features
 
-- 32-bit ALU design using Verilog HDL
-- Supports two 32-bit input operands
-- Performs arithmetic and logical operations
-- Two-step input loading using 16-bit switches
-- Push-button controlled FSM
-- Button debouncing
-- Edge detection for reliable button presses
-- 7-segment display for output visualization
-- LED-based status flag display
-- Simulation using a self-checking testbench
-- FPGA implementation on the Basys3 board
+- 16-bit Carry Save Adder
+- Adds three 16-bit operands:
+  - `A`
+  - `B`
+  - `C`
+- Supports an additional `Carry-In (Cin)`
+- Modular design using 4-bit CSA blocks
+- Full Adder based implementation
+- Hierarchical Verilog design
+- Simulation and functional verification using a testbench
+- FPGA implementation on Basys3
+- Push-button controlled operand loading
+- Switches used as 16-bit input data
+- LEDs used to display the output result
 
 ---
 
-## ALU Operations
+## Block Diagram
 
-The ALU supports the following operations:
-
-| Opcode | Operation | Description |
-|--------|-----------|-------------|
-| `000` | ADD | A + B |
-| `001` | SUB | A - B |
-| `010` | AND | A & B |
-| `011` | OR | A \| B |
-| `100` | XOR | A ^ B |
-| `101` | NOT | ~A |
-| `110` | MUL | A × B |
-| `111` | Reserved | Reserved for future use |
-
-The multiplication operation produces a 64-bit result, while the other operations produce a 32-bit result.
-
----
-
-## Architecture
-
-The overall system consists of the following modules:
+The overall architecture consists of:
 
 ```text
-                  +----------------------+
-                  |    16-bit Switches   |
-                  |       SW[15:0]       |
-                  +----------+-----------+
-                             |
-                             v
-                  +----------------------+
-                  |   Input Loading FSM  |
-                  +----------+-----------+
-                             |
-                 +-----------+-----------+
-                 |                       |
-                 v                       v
-              Operand A               Operand B
-              32-bit                  32-bit
-                 |                       |
-                 +-----------+-----------+
-                             |
-                             v
-                  +----------------------+
-                  |       32-bit ALU     |
-                  +----------+-----------+
-                             |
-                +------------+------------+
-                |            |            |
-                v            v            v
-             Result       Carry Flag   Overflow Flag
-                |
-                v
-       +----------------------+
-       |   LEDs / 7-Segment   |
-       |       Display        |
-       +----------------------+
+             A[15:0]
+                 |
+             B[15:0]
+                 |
+             C[15:0]
+                 |
+             Cin
+                 |
+                 v
+       +-------------------+
+       |   16-bit CSA      |
+       |                   |
+       |  +-------------+  |
+       |  | 4-bit CSA   |  |
+       |  +-------------+  |
+       |         |         |
+       |  +-------------+  |
+       |  | 4-bit CSA   |  |
+       |  +-------------+  |
+       |         |         |
+       |  +-------------+  |
+       |  | 4-bit CSA   |  |
+       |  +-------------+  |
+       |         |         |
+       |  +-------------+  |
+       |  | 4-bit CSA   |  |
+       |  +-------------+  |
+       +-------------------+
+                 |
+                 v
+          16-bit Sum
+                 |
+          Carry Outputs
 ````
 
 ---
 
-## 32-bit Operand Input
+## Working Principle
 
-The Basys3 FPGA board has 16 switches, while the ALU requires 32-bit operands.
+The Carry Save Adder operates on three input operands simultaneously.
 
-Therefore, each operand is entered in two steps.
-
-For operand A:
+Each bit position uses a **Full Adder** to process:
 
 ```text
-Step 1:
-SW[15:0] → A[15:0]
-Press button
-
-Step 2:
-SW[15:0] → A[31:16]
-Press button
+A[i] + B[i] + C[i]
 ```
 
-The same process is repeated for operand B.
+The Full Adder generates:
 
-The operand registers retain the previously entered values while the switches are reused for the next input.
+* Sum bit
+* Carry bit
+
+The carry is then propagated through the required stages of the design.
+
+The 16-bit CSA is divided into four 4-bit blocks:
 
 ```text
-A[31:16] + A[15:0] → 32-bit A
-
-B[31:16] + B[15:0] → 32-bit B
+Block 0 → Bits [3:0]
+Block 1 → Bits [7:4]
+Block 2 → Bits [11:8]
+Block 3 → Bits [15:12]
 ```
 
-This allows a 32-bit ALU to be implemented using the 16 physical switches available on the Basys3 board.
+The carry generated by one block is used as the carry input for the next block.
+
+The final output consists of:
+
+```text
+Sum[15:0]
+Carry-Out
+Final Carry
+```
+
+Together, these outputs represent the complete addition result.
 
 ---
 
-## FSM-Based Control
+## Modules
 
-A Finite State Machine (FSM) controls the input sequence.
+### 1. Full Adder
 
-A typical sequence is:
+The Full Adder is the basic building block of the CSA.
+
+Inputs:
 
 ```text
-LOAD_A_LOW
-      |
-      v
-LOAD_A_HIGH
-      |
-      v
-LOAD_B_LOW
-      |
-      v
-LOAD_B_HIGH
-      |
-      v
-SELECT_OPERATION
-      |
-      v
-COMPUTE
-      |
-      v
-DISPLAY_RESULT
+A
+B
+Cin
 ```
 
-Each button press advances the FSM to the next state.
+Outputs:
 
-The operand registers store each 16-bit portion and combine them to form the complete 32-bit operands.
+```text
+Sum
+Cout
+```
+
+The logic equations are:
+
+```text
+Sum = A XOR B XOR Cin
+
+Cout = AB + BCin + ACin
+```
+
+---
+
+### 2. 4-bit Carry Save Adder
+
+The 4-bit CSA block is constructed using multiple Full Adders.
+
+It processes:
+
+```text
+A[3:0]
+B[3:0]
+C[3:0]
+```
+
+along with:
+
+```text
+Cin
+```
+
+The block generates:
+
+```text
+Sum[3:0]
+Cout
+Carry
+```
+
+The `Cout` output is passed to the next 4-bit block as its carry input.
+
+---
+
+### 3. 16-bit Carry Save Adder
+
+Four 4-bit CSA blocks are connected together to form the complete 16-bit CSA.
+
+```text
+        A[15:0]
+        B[15:0]
+        C[15:0]
+           |
+           v
+    +-------------+
+    | 4-bit CSA   |  Bits [3:0]
+    +-------------+
+           |
+           v
+    +-------------+
+    | 4-bit CSA   |  Bits [7:4]
+    +-------------+
+           |
+           v
+    +-------------+
+    | 4-bit CSA   |  Bits [11:8]
+    +-------------+
+           |
+           v
+    +-------------+
+    | 4-bit CSA   |  Bits [15:12]
+    +-------------+
+           |
+           v
+      Final Result
+```
+
+---
+
+## FPGA Implementation
+
+The design can be implemented on the **Basys3 FPGA development board**.
+
+### Inputs
+
+The 16 onboard switches are used to provide the input operands.
+
+```text
+SW[15:0] → 16-bit input data
+```
+
+Three operands are loaded sequentially:
+
+```text
+1. Operand A
+2. Operand B
+3. Operand C
+```
+
+The center push button (`btnC`) is used to load each operand.
+
+The up button (`btnU`) is used to reset the system.
+
+---
+
+## FSM Operation
+
+A simple Finite State Machine is used to control operand loading.
+
+```text
+          +---------+
+          | LOAD_A  |
+          +---------+
+               |
+            btnC
+               |
+               v
+          +---------+
+          | LOAD_B  |
+          +---------+
+               |
+            btnC
+               |
+               v
+          +---------+
+          | LOAD_C  |
+          +---------+
+               |
+            btnC
+               |
+               v
+          +---------+
+          | COMPUTE |
+          +---------+
+               |
+            btnC
+               |
+               v
+          +---------+
+          | LOAD_A  |
+          +---------+
+```
+
+### State Description
+
+| State     | Operation                  |
+| --------- | -------------------------- |
+| `LOAD_A`  | Load first 16-bit operand  |
+| `LOAD_B`  | Load second 16-bit operand |
+| `LOAD_C`  | Load third 16-bit operand  |
+| `COMPUTE` | Display final CSA result   |
+
+The `btnU` button resets the FSM back to the `LOAD_A` state.
 
 ---
 
 ## Button Debouncing
 
-Mechanical push buttons do not generate a perfectly clean digital signal. When a button is pressed, the signal may rapidly switch between `0` and `1` for a short period. This phenomenon is known as button bouncing.
+Mechanical push buttons generate multiple transitions when pressed due to **switch bouncing**.
 
-A debouncer is used to ensure that the FPGA recognizes a stable button press.
+To prevent multiple unintended button presses, a debouncer circuit is used.
 
-The signal processing flow is:
+The signal flow is:
 
 ```text
 Physical Button
@@ -171,165 +302,78 @@ Synchronizer
 Debouncer
       |
       v
-Stable Button Signal
+Clean Button Signal
       |
       v
 Edge Detector
       |
       v
-Single-Cycle Pulse
+Single Clock-Cycle Pulse
       |
       v
 FSM
 ```
 
-The edge detector ensures that one physical button press generates only one FSM transition.
-
----
-
-## Status Flags
-
-The ALU generates status flags to indicate specific conditions.
-
-### Carry Flag
-
-The carry flag indicates a carry generated during an unsigned addition operation.
-
-### Overflow Flag
-
-The overflow flag indicates that the result of a signed arithmetic operation cannot be represented within the 32-bit signed range.
-
-### Zero Flag
-
-The zero flag is set when the ALU result is equal to zero.
-
-```text
-Zero Flag = 1  →  Result = 0
-Zero Flag = 0  →  Result ≠ 0
-```
-
-These flags can be displayed using the onboard LEDs.
-
----
-
-## Display
-
-The ALU result is displayed using the FPGA's onboard display hardware.
-
-Since the 32-bit result is larger than what can be displayed simultaneously, the result can be viewed in sections.
-
-The display can show:
-
-```text
-Result[31:16]
-```
-
-or
-
-```text
-Result[15:0]
-```
-
-A push button can be used to toggle between the upper and lower 16 bits of the result.
-
-The status flags are displayed separately using LEDs.
+The edge detector ensures that one physical button press generates only one pulse for the FSM.
 
 ---
 
 ## Simulation
 
-A self-checking Verilog testbench is used to verify the functionality of the ALU.
+A Verilog testbench is used to verify the functionality of the CSA.
 
-The testbench checks:
+The testbench verifies:
 
-* Reset behavior
-* Operand loading sequence
-* Addition
-* Subtraction
-* AND operation
-* OR operation
-* XOR operation
-* NOT operation
-* Multiplication
+* Basic addition
+* Addition with carry-in
+* Zero inputs
+* Maximum 16-bit values
+* Large input combinations
 * Carry generation
-* Overflow detection
-* Zero detection
-* Display switching
+* Final output correctness
+* FSM operand loading sequence
 
 Example test cases:
 
 ```text
-A = 10
-B = 5
+5 + 3 + 2 + 0 = 10
 
-ADD:
-10 + 5 = 15
+100 + 200 + 300 + 0 = 600
 
-SUB:
-10 - 5 = 5
+1 + 1 + 1 + 1 = 4
 
-AND:
-10 & 5
-
-OR:
-10 | 5
-
-XOR:
-10 ^ 5
+0 + 0 + 0 + 0 = 0
 ```
 
-The testbench compares the ALU output with the expected result and reports `PASS` or `FAIL`.
-
----
-
-## FPGA Implementation
-
-The project is designed for the:
-
-* Digilent Basys3 FPGA Board
-* Xilinx Artix-7 FPGA
-* XC7A35T FPGA device
-
-### Inputs
-
-```text
-SW[15:0]  → 16-bit input data
-Buttons   → Operand loading and control
-```
-
-### Outputs
-
-```text
-LEDs      → Status flags and output indication
-7-Segment → ALU result
-```
+The testbench also checks the complete result including the carry outputs.
 
 ---
 
 ## Tools Used
 
-* Verilog HDL
-* Xilinx Vivado
-* Vivado Simulator
-* Digilent Basys3 FPGA Board
-* Xilinx Artix-7 FPGA
+* **Verilog HDL**
+* **Xilinx Vivado**
+* **Xilinx Artix-7 FPGA**
+* **Digilent Basys3 FPGA Board**
+* **Vivado Simulator**
 
 ---
 
 ## Project Structure
 
 ```text
-32-bit-ALU/
+16-bit-Carry-Save-Adder/
 │
 ├── src/
-│   ├── alu.v
+│   ├── FA.v
+│   ├── carrysave_4bit.v
+│   ├── carrysave.v
 │   ├── debouncer.v
 │   ├── edge_detect.v
-│   ├── seven_segment.v
-│   └── main.v
+│   └── top_fpga.v
 │
 ├── simulation/
-│   └── tb_main.v
+│   └── tb_top.v
 │
 ├── constraints/
 │   └── basys3.xdc
@@ -341,117 +385,113 @@ LEDs      → Status flags and output indication
 
 ## How to Run
 
-### 1. Create a Vivado Project
+### Step 1: Create a Vivado Project
 
-Create a new RTL project in Xilinx Vivado.
+Create a new RTL project in Vivado and select the target FPGA device:
 
-Select the appropriate Basys3 Artix-7 FPGA device.
+```text
+XC7A35T-1CPG236C
+```
 
-### 2. Add Design Sources
+### Step 2: Add Design Sources
 
 Add all Verilog source files to the project.
 
-### 3. Add Simulation Sources
+### Step 3: Add Simulation Sources
 
 Add the testbench file:
 
 ```text
-tb_main.v
+tb_top.v
 ```
 
-### 4. Add Constraints
+### Step 4: Add Constraints
 
-Add the Basys3 `.xdc` file containing the required pin assignments.
+Add the Basys3 XDC constraint file.
 
-### 5. Set the Top Module
+### Step 5: Set Top Module
 
-Set the main FPGA wrapper module as the top module.
-
-For example:
+Set:
 
 ```text
-main
+top_fpga
 ```
 
-### 6. Run Simulation
+as the top module.
 
-Run behavioral simulation and verify that all ALU operations produce the expected results.
+### Step 6: Run Simulation
 
-### 7. Run Synthesis
+Run behavioral simulation to verify the design.
 
-Run synthesis and check for errors and warnings.
+### Step 7: Run Synthesis
 
-### 8. Run Implementation
+Run synthesis and check for errors or warnings.
+
+### Step 8: Run Implementation
 
 Run implementation to perform placement and routing.
 
-### 9. Generate Bitstream
+### Step 9: Generate Bitstream
 
 Generate the FPGA bitstream.
 
-### 10. Program the FPGA
+### Step 10: Program the FPGA
 
-Connect the Basys3 board to the computer through USB and program the FPGA using Vivado Hardware Manager.
+Connect the Basys3 board through USB and program the generated bitstream using Vivado Hardware Manager.
 
 ---
 
 ## Hardware Usage
 
-1. Power on the Basys3 FPGA board.
-2. Enter the lower 16 bits of operand A using the switches.
-3. Press the assigned button to store the lower half.
-4. Enter the upper 16 bits of operand A.
-5. Press the button to store the upper half.
-6. Repeat the process for operand B.
-7. Select the required ALU operation.
-8. The ALU performs the selected operation.
-9. View the result on the 7-segment display.
-10. Check the status flags on the LEDs.
-11. Use the display toggle button to switch between the upper and lower 16 bits of the result.
+1. Power on the Basys3 board.
+2. Set the switches to the desired value of operand `A`.
+3. Press `btnC` to load `A`.
+4. Set the switches to operand `B`.
+5. Press `btnC` to load `B`.
+6. Set the switches to operand `C`.
+7. Set the required carry-in value.
+8. Press `btnC` to load `C` and start computation.
+9. The final result is displayed on the LEDs.
+10. Press `btnC` again to restart the process.
+11. Press `btnU` at any time to reset the system.
 
 ---
 
 ## Example
 
-Consider:
+For:
 
 ```text
-A = 32'd100
-B = 32'd50
-Operation = ADD
+A   = 5
+B   = 3
+C   = 2
+Cin = 0
 ```
 
-The ALU performs:
+The expected result is:
 
 ```text
-100 + 50 = 150
+5 + 3 + 2 + 0 = 10
 ```
 
-The output is:
+Binary result:
 
 ```text
-Result = 32'd150
+0000 0000 0000 1010
 ```
 
-The corresponding hexadecimal result is:
-
-```text
-00000096
-```
+The corresponding result is displayed on the FPGA LEDs.
 
 ---
 
 ## Future Improvements
 
-* Add more arithmetic operations
-* Add shift and rotate operations
-* Implement signed and unsigned arithmetic modes
-* Add a dedicated opcode input interface
+* Implement a fully parallel carry-save architecture
+* Increase the adder width to 32-bit or 64-bit
+* Compare CSA performance with Ripple Carry Adder and Carry Look-Ahead Adder
+* Optimize FPGA resource utilization
 * Add UART-based input and output
-* Optimize multiplication hardware
-* Implement pipelining for higher operating frequency
-* Compare performance with different ALU architectures
-* Extend the design to a complete 32-bit processor datapath
+* Integrate the CSA into a larger arithmetic unit or processor system
 
 ---
 
@@ -467,3 +507,4 @@ IIIT Nagpur
 ## License
 
 This project is intended for educational and academic purposes.
+
