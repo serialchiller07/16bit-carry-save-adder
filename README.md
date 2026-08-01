@@ -8,6 +8,8 @@ The design is implemented using **4-bit CSA blocks**, which are combined to form
 
 The project is designed and simulated using **Xilinx Vivado** and can be implemented on a **Digilent Basys3 FPGA board** based on the Xilinx Artix-7 FPGA.
 
+Also I tried to use microblaze implementation but was unsuccessful but just for reference i have attached the design. [Do help me out if u can in solving microblaze stuck to reset error :) ]
+
 ---
 
 ## Features
@@ -67,3 +69,6 @@ The overall architecture consists of:
           16-bit Sum
                  |
           Carry Outputs
+
+
+
